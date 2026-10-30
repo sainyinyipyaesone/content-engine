@@ -19,10 +19,13 @@ Add these under **Settings → Secrets and variables → Actions → Secrets**:
 | `OPENAI_API_KEY` | Required for newsletter and social draft generation |
 | `REDDIT_CLIENT_ID` | Reddit OAuth app client ID |
 | `REDDIT_CLIENT_SECRET` | Reddit OAuth app client secret |
+| `REDDIT_REFRESH_TOKEN` | Optional Reddit OAuth refresh token with Data API `read` access |
 | `N8N_WEBHOOK_URL` | HTTPS production URL for the n8n webhook |
 | `N8N_WEBHOOK_TOKEN` | Secret for the webhook `Authorization` header, configured in n8n Header Auth |
 
 `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` are optional if Reddit is disabled in `config/sources.json`. Set the optional `OPENAI_MODEL` repository variable to override the default `gpt-5-mini`.
+
+For user-authorized Reddit access, follow [Reddit's OAuth guide](https://github.com/reddit-archive/reddit/wiki/OAuth2) to authorize the app with the `read` scope and obtain a refresh token. Store that token as the `REDDIT_REFRESH_TOKEN` Actions secret alongside the app's client ID and secret. Each run exchanges the refresh token for a short-lived access token. Without a refresh token, the fetcher uses the existing client-credentials grant. Reddit Data API access is required to fetch subreddit posts; Ads API access alone may not grant it. Never commit or share tokens.
 
 The first workflow needs permission to create branches and pull requests. The asset and publish workflows push generated files to their target branches; if branch protection blocks Actions writes, allow the GitHub Actions bot to update those branches or adjust the workflows.
 

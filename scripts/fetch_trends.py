@@ -84,9 +84,12 @@ def fetch_hacker_news(limit: int) -> list[dict[str, str | int]]:
     return [story for story in stories if story is not None]
 
 
-def get_reddit_token(client_id: str, client_secret: str) -> str:
+def get_reddit_token(client_id: str, client_secret: str, refresh_token: str = "") -> str:
     credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    body = urlencode({"grant_type": "client_credentials"}).encode()
+    if refresh_token:
+        body = urlencode({"grant_type": "refresh_token", "refresh_token": refresh_token}).encode()
+    else:
+        body = urlencode({"grant_type": "client_credentials"}).encode()
     response = request_json(
         "https://www.reddit.com/api/v1/access_token",
         headers={
@@ -111,7 +114,8 @@ def fetch_reddit(subreddits: list[str], limit: int) -> list[dict[str, str | int]
         )
         return []
 
-    token = get_reddit_token(client_id, client_secret)
+    refresh_token = os.environ.get("REDDIT_REFRESH_TOKEN", "")
+    token = get_reddit_token(client_id, client_secret, refresh_token)
     items: list[dict[str, str | int]] = []
     for subreddit in subreddits:
         url = f"https://oauth.reddit.com/r/{quote(subreddit, safe='')}/hot.json?{urlencode({'limit': limit})}"
