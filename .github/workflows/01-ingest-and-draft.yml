@@ -90,6 +90,7 @@ jobs:
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_REFRESH_TOKEN: ${{ secrets.REDDIT_REFRESH_TOKEN }}
           ISSUE_DATE: ${{ steps.branch.outputs.issue_date }}
         run: python scripts/fetch_trends.py --date "$ISSUE_DATE"
 
