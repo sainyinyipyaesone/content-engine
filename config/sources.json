@@ -3,18 +3,12 @@
     "enabled": true,
     "limit": 20
   },
-  "reddit": {
-    "enabled": true,
-    "subreddits": [
-      "technology",
-      "programming",
-      "MachineLearning"
-    ],
-    "limit": 10
-  },
   "rss_feeds": [
-  "https://rss.arxiv.org/rss/cs.AI",
-  "https://huggingface.co/blog/feed.xml",
-  "https://techcrunch.com/category/artificial-intelligence/feed/"
-]
+    "https://rss.arxiv.org/rss/cs.AI",
+    "https://huggingface.co/blog/feed.xml",
+    "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "https://dev.to/feed/tag/technology",
+    "https://dev.to/feed/tag/programming",
+    "https://dev.to/feed/tag/ai"
+  ]
 }
