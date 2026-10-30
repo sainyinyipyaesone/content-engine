@@ -1,0 +1,72 @@
+name: Archive newsletter and notify n8n
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: newsletter-publish-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'automation/newsletter-draft-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the merged default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Find the merged newsletter draft
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          paths="$(gh pr view "$PR_NUMBER" --json files --jq '[.files[].path | select(test("^content/newsletters/draft-issue-[0-9]+[.]md$"))] | .[]')"
+          if [ -z "$paths" ] || [ "$(printf '%s\n' "$paths" | wc -l)" -ne 1 ]; then
+            echo "Expected exactly one newsletter draft in the merged pull request." >&2
+            exit 1
+          fi
+          echo "draft_path=$paths" >> "$GITHUB_OUTPUT"
+
+      - name: Archive the merged issue
+        id: archive
+        env:
+          DRAFT_PATH: ${{ steps.issue.outputs.draft_path }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          python scripts/archive_issue.py "$DRAFT_PATH"
+          archive_path="$(sed -n 's/^archive_path=//p' "$GITHUB_OUTPUT" | tail -n 1)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- content/newsletters
+          if ! git diff --cached --quiet; then
+            git commit -m "Archive newsletter ${archive_path##*/}"
+            git push origin "HEAD:${BASE_BRANCH}"
+          fi
+          echo "archive_path=$archive_path" >> "$GITHUB_OUTPUT"
+
+      - name: Send the archived issue to n8n
+        env:
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+          N8N_WEBHOOK_TOKEN: ${{ secrets.N8N_WEBHOOK_TOKEN }}
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          ARCHIVE_PATH: ${{ steps.archive.outputs.archive_path }}
+        run: python scripts/publish_dispatch.py "$ARCHIVE_PATH"
