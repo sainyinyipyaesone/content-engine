@@ -1,0 +1,16 @@
+{
+  "hacker_news": {
+    "enabled": true,
+    "limit": 20
+  },
+  "reddit": {
+    "enabled": true,
+    "subreddits": [
+      "technology",
+      "programming",
+      "MachineLearning"
+    ],
+    "limit": 10
+  },
+  "rss_feeds": []
+}

@@ -1,0 +1,11 @@
+{
+  "twitter": {
+    "instruction": "Write one clear, engaging post and end with the literal placeholder [newsletter link]. Do not invent a URL. Stay within 280 characters."
+  },
+  "linkedin": {
+    "instruction": "Write a professional post with a useful takeaway and end with the literal placeholder [newsletter link]. Do not invent a URL. Keep it under 180 words."
+  },
+  "telegram": {
+    "instruction": "Write a concise, friendly update and end with the literal placeholder [newsletter link]. Do not invent a URL. Use plain text and avoid excessive emoji."
+  }
+}
