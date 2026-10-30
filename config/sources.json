@@ -12,5 +12,9 @@
     ],
     "limit": 10
   },
-  "rss_feeds": []
+  "rss_feeds": [
+  "https://rss.arxiv.org/rss/cs.AI",
+  "https://huggingface.co/blog/feed.xml",
+  "https://techcrunch.com/category/artificial-intelligence/feed/"
+]
 }
