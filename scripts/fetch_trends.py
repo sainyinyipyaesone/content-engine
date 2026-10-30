@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
-"""Fetch configured Hacker News, Reddit, and RSS items into the content archive."""
+"""Fetch configured Hacker News and RSS items into the content archive."""
 
 from __future__ import annotations
 
 import argparse
-import base64
 import html
 import json
-import os
 import re
-import sys
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 
@@ -41,10 +37,8 @@ def plain_text(value: str, limit: int = 1200) -> str:
     return html.unescape(text)[:limit]
 
 
-def request_bytes(url: str, *, headers: dict[str, str] | None = None, data: bytes | None = None) -> bytes:
-    request_headers = {"User-Agent": USER_AGENT}
-    request_headers.update(headers or {})
-    request = Request(url, data=data, headers=request_headers)
+def request_bytes(url: str) -> bytes:
+    request = Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urlopen(request, timeout=25) as response:
             return response.read()
@@ -54,8 +48,8 @@ def request_bytes(url: str, *, headers: dict[str, str] | None = None, data: byte
         raise RuntimeError(f"Request failed: {url} ({error.reason})") from error
 
 
-def request_json(url: str, *, headers: dict[str, str] | None = None, data: bytes | None = None) -> dict | list:
-    return json.loads(request_bytes(url, headers=headers, data=data))
+def request_json(url: str) -> dict | list:
+    return json.loads(request_bytes(url))
 
 
 def fetch_hacker_news(limit: int) -> list[dict[str, str | int]]:
@@ -82,67 +76,6 @@ def fetch_hacker_news(limit: int) -> list[dict[str, str | int]]:
     with ThreadPoolExecutor(max_workers=8) as executor:
         stories = list(executor.map(fetch_story, story_ids[:limit]))
     return [story for story in stories if story is not None]
-
-
-def get_reddit_token(client_id: str, client_secret: str, refresh_token: str = "") -> str:
-    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    if refresh_token:
-        body = urlencode({"grant_type": "refresh_token", "refresh_token": refresh_token}).encode()
-    else:
-        body = urlencode({"grant_type": "client_credentials"}).encode()
-    response = request_json(
-        "https://www.reddit.com/api/v1/access_token",
-        headers={
-            "Authorization": f"Basic {credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data=body,
-    )
-    if not isinstance(response, dict) or not response.get("access_token"):
-        raise RuntimeError("Reddit did not return an access token")
-    return str(response["access_token"])
-
-
-def fetch_reddit(subreddits: list[str], limit: int) -> list[dict[str, str | int]]:
-    client_id = os.environ.get("REDDIT_CLIENT_ID", "")
-    client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
-    if not client_id or not client_secret:
-        print(
-            "Reddit is enabled but skipped: configure REDDIT_CLIENT_ID and "
-            "REDDIT_CLIENT_SECRET in repository Actions secrets.",
-            file=sys.stderr,
-        )
-        return []
-
-    refresh_token = os.environ.get("REDDIT_REFRESH_TOKEN", "")
-    token = get_reddit_token(client_id, client_secret, refresh_token)
-    items: list[dict[str, str | int]] = []
-    for subreddit in subreddits:
-        url = f"https://oauth.reddit.com/r/{quote(subreddit, safe='')}/hot.json?{urlencode({'limit': limit})}"
-        response = request_json(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        if not isinstance(response, dict):
-            raise RuntimeError(f"Reddit returned an invalid response for r/{subreddit}")
-        children = response.get("data", {}).get("children", [])
-        for child in children:
-            post = child.get("data", {})
-            if not post.get("title"):
-                continue
-            items.append(
-                {
-                    "source": f"reddit:r/{subreddit}",
-                    "title": str(post["title"]),
-                    "url": f"https://www.reddit.com{post.get('permalink', '')}",
-                    "summary": plain_text(str(post.get("selftext", ""))),
-                    "score": int(post.get("score", 0)),
-                    "published": datetime.fromtimestamp(
-                        float(post.get("created_utc", 0)), timezone.utc
-                    ).isoformat() if post.get("created_utc") else "",
-                }
-            )
-    return items
 
 
 def parse_rss(xml_data: bytes, feed_url: str) -> list[dict[str, str | int]]:
@@ -221,15 +154,6 @@ def collect(date: str) -> Path:
     hacker_news = config.get("hacker_news", {})
     if hacker_news.get("enabled", False):
         items.extend(fetch_hacker_news(int(hacker_news.get("limit", 20))))
-
-    reddit = config.get("reddit", {})
-    if reddit.get("enabled", False):
-        items.extend(
-            fetch_reddit(
-                [str(name) for name in reddit.get("subreddits", [])],
-                int(reddit.get("limit", 10)),
-            )
-        )
 
     items.extend(fetch_rss([str(url) for url in config.get("rss_feeds", [])]))
     items = deduplicate(items)
